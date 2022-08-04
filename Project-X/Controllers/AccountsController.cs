@@ -12,20 +12,10 @@ namespace Project_X.Controllers
     public class AccountsController : ControllerBase
     {
         private readonly IAuthService _authService;
+        private readonly ILogger<AccountsController> _logger;
 
-        public AccountsController(IAuthService authService) =>
-            (_authService) = (authService);
-
-        [HttpPost]
-        public async Task<ActionResult> Register(RegisterViewModel model)
-        {
-            var result = await _authService.RegisterAdminAsync(model);
-            if (result != null)
-                return Ok(result);
-
-            throw new Exception("faild!");
-        }
-
+        public AccountsController(IAuthService authService, ILogger<AccountsController> logger) =>
+            (_authService, _logger) = (authService, logger);
 
         [HttpPost("Login")]
         public async Task<IActionResult> Login(LoginUserViewModel user)
@@ -33,11 +23,11 @@ namespace Project_X.Controllers
             var jwtResult = await _authService.SignInJWTAsync(user.Username, user.Password,
                 user.RememberMe ? IpAddress() : null);
 
-            if(jwtResult != null)
+            if (jwtResult != null)
             {
-                //_logger.Info("User logged in. UserName : {0}", user.Username);
+                _logger.LogInformation("User logged in. UserName : {0}", user.Username);
                 if (user.RememberMe)
-                    SetTokenCookie(jwtResult?.RefreshToken);
+                    SetTokenCookie(jwtResult.RefreshToken);
                 return Ok(jwtResult);
             }
 
@@ -57,6 +47,25 @@ namespace Project_X.Controllers
             SetTokenCookie(response.RefreshToken);
 
             return Ok(response);
+        }
+
+        [HttpPost]
+        //[Authorize(Roles = "Admin")]
+        [Route("revoke-token")]
+        public IActionResult RevokeToken(RevokeTokenRequest model)
+        {
+            // accept token from request body or cookie
+            var token = model.Token ?? Request.Cookies["refreshToken"];
+
+            if (string.IsNullOrEmpty(token))
+                return BadRequest(new { message = "Token is required" });
+
+            var response = _authService.RevokeToken(token, IpAddress());
+
+            if (!response)
+                return NotFound(new { message = "Token not found" });
+
+            return Ok(new { message = "Token revoked" });
         }
 
         private string IpAddress()

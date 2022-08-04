@@ -12,8 +12,8 @@ using Project_X.Data;
 namespace Project_X.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20220804124659_refresh tokens table with application user changes")]
-    partial class refreshtokenstablewithapplicationuserchanges
+    [Migration("20220804144651_Refresh Token Table With Application User Changes")]
+    partial class RefreshTokenTableWithApplicationUserChanges
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -240,6 +240,8 @@ namespace Project_X.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Email");
+
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
 
@@ -260,6 +262,7 @@ namespace Project_X.Data.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1L, 1);
 
                     b.Property<string>("ApplicationUserId")
+                        .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("CreatedBy")
@@ -363,7 +366,9 @@ namespace Project_X.Data.Migrations
                 {
                     b.HasOne("Project_X.Data.Models.ApplicationUser", null)
                         .WithMany("RefreshTokens")
-                        .HasForeignKey("ApplicationUserId");
+                        .HasForeignKey("ApplicationUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Project_X.Data.Models.ApplicationUser", b =>

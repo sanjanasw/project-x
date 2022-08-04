@@ -2,8 +2,10 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using AutoMapper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -16,21 +18,22 @@ using Project_X.Helpers.JWT;
 
 namespace Project_X.Business
 {
-	public class AuthService: IAuthService
-	{
+    public class AuthService : IAuthService
+    {
         private readonly ApplicationDbContext _context;
-		private readonly UserManager<ApplicationUser> _userManager;
-		private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly RoleManager<IdentityRole> _roleManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
-		private readonly ILogger<AuthService> _logger;
+        private readonly IMapper _mapper;
+        private readonly ILogger<AuthService> _logger;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly JWTConfigurations _jwtConfigurations;
 
-		public AuthService(ApplicationDbContext context, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager,
-            SignInManager<ApplicationUser> signInManager, ILogger<AuthService> logger, IHttpContextAccessor httpContextAccessor,
+        public AuthService(ApplicationDbContext context, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager,
+            SignInManager<ApplicationUser> signInManager, IMapper mapper, ILogger<AuthService> logger, IHttpContextAccessor httpContextAccessor,
             IOptions<JWTConfigurations> jwtConfigurations) =>
-			(_context, _userManager, _roleManager, _signInManager, _logger, _httpContextAccessor, _jwtConfigurations) =
-            (context, userManager, roleManager, signInManager, logger, httpContextAccessor, jwtConfigurations.Value);
+            (_context, _userManager, _roleManager, _signInManager, _mapper, _logger, _httpContextAccessor, _jwtConfigurations) =
+            (context, userManager, roleManager, signInManager, mapper, logger, httpContextAccessor, jwtConfigurations.Value);
 
 
         public async Task<JWTResult> SignInJWTAsync(string username, string password, string? ipAddress = null)
@@ -62,13 +65,16 @@ namespace Project_X.Business
                         var jwtResult = new JWTResult
                         {
                             Token = new JwtSecurityTokenHandler().WriteToken(token),
-                            Expiration = token.ValidTo
+                            Expiration = token.ValidTo,
+                            User = _mapper.Map<UserViewModel>(user)
                         };
 
                         if (ipAddress != null)
                         {
+                            var tokens = new List<RefreshToken>();
                             var refreshToken = GenerateRefreshToken(ipAddress);
-                            user.RefreshTokens.Add(refreshToken);
+                            tokens.Add(refreshToken);
+                            user.RefreshTokens = tokens;
                             _context.Set<ApplicationUser>().Update(user);
                             await _context.SaveChangesAsync();
                             jwtResult.RefreshToken = refreshToken.Token;
@@ -116,40 +122,88 @@ namespace Project_X.Business
             return null;
         }
 
+        public Task SignOutAsync()
+        {
+            return _signInManager.SignOutAsync();
+        }
+
+        public bool RevokeToken(string token, string ipAddress)
+        {
+            try
+            {
+                var user = _context.Set<ApplicationUser>().Include(x => x.RefreshTokens)
+                .SingleOrDefault(u => u.RefreshTokens.Any(t => t.Token == token));
+
+                // return false if no user found with token
+                if (user == null)
+                    return false;
+
+                var refreshToken = user.RefreshTokens.SingleOrDefault(x => x.Token == token);
+
+                // return false if token is not active
+                if (!refreshToken.IsActive)
+                    return false;
+
+                // revoke token and save
+                refreshToken.Revoked = DateTime.UtcNow;
+                refreshToken.RevokedByIp = ipAddress;
+                _context.Update(user);
+                _context.SaveChanges();
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
+        }
+
         public async Task<JWTResult> RefreshToken(string token, string ipAddress)
         {
-            
-            var user = _context.Set<ApplicationUser>().SingleOrDefault(u => u.RefreshTokens.Any(t => t.Token == token));
 
-            // return null if no user found with token
-            if (user == null) return null;
-
-            var refreshToken = user.RefreshTokens.Single(x => x.Token == token);
-
-            // return null if token is no longer active
-            if (!refreshToken.IsActive) return null;
-
-            // replace old refresh token with a new one and save
-            var newRefreshToken = GenerateRefreshToken(ipAddress);
-            refreshToken.Revoked = DateTime.UtcNow;
-            refreshToken.RevokedByIp = ipAddress;
-            refreshToken.ReplacedByToken = newRefreshToken.Token;
-            user.RefreshTokens.Add(newRefreshToken);
-            _context.Update(user);
-            await _context.SaveChangesAsync();
-
-            var userRoles = await _userManager.GetRolesAsync(user);
-
-            // generate new jwt
-            var jwtToken = GenerateJWT(user, userRoles);
-            var jwtResult = new JWTResult
+            try
             {
-                Token = new JwtSecurityTokenHandler().WriteToken(jwtToken),
-                Expiration = jwtToken.ValidTo,
-                RefreshToken = newRefreshToken.Token
-            };
+                var user = _context.Set<ApplicationUser>().Include(x => x.RefreshTokens)
+                    .SingleOrDefault(u => u.RefreshTokens.Any(t => t.Token == token));
 
-            return jwtResult;
+                // return null if no user found with token
+                if (user == null)
+                    return null;
+
+                var refreshToken = user.RefreshTokens.SingleOrDefault(x => x.Token == token);
+
+                // return null if token is no longer active
+                if (!refreshToken.IsActive)
+                    return null;
+
+                // replace old refresh token with a new one and save
+                var newRefreshToken = GenerateRefreshToken(ipAddress);
+                refreshToken.Revoked = DateTime.UtcNow;
+                refreshToken.RevokedByIp = ipAddress;
+                refreshToken.ReplacedByToken = newRefreshToken.Token;
+                user.RefreshTokens.Add(newRefreshToken);
+                _context.Update(user);
+                await _context.SaveChangesAsync();
+
+                var userRoles = await _userManager.GetRolesAsync(user);
+
+                // generate new jwt
+                var jwtToken = GenerateJWT(user, userRoles);
+                var jwtResult = new JWTResult
+                {
+                    Token = new JwtSecurityTokenHandler().WriteToken(jwtToken),
+                    Expiration = jwtToken.ValidTo,
+                    RefreshToken = newRefreshToken.Token
+                };
+
+                return jwtResult;
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
         }
 
         private RefreshToken GenerateRefreshToken(string ipAddress)

@@ -29,7 +29,6 @@ namespace Project_X.Data.Models
 
         public RecordStatus Status { get; set; }
 
-        [JsonIgnore]
-        public virtual List<RefreshToken>? RefreshTokens { get; set; }
+        public virtual List<RefreshToken> RefreshTokens { get; set; }
     }
 }

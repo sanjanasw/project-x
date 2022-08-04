@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Project_X.Data.Migrations
 {
-    public partial class refreshtokenstablewithapplicationuserchanges : Migration
+    public partial class RefreshTokenTableWithApplicationUserChanges : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -29,7 +29,7 @@ namespace Project_X.Data.Migrations
                     Revoked = table.Column<DateTime>(type: "datetime2", nullable: true),
                     RevokedByIp = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     ReplacedByToken = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    ApplicationUserId = table.Column<string>(type: "nvarchar(450)", nullable: true),
+                    ApplicationUserId = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -49,6 +49,11 @@ namespace Project_X.Data.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_AspNetUsers_Email",
+                table: "AspNetUsers",
+                column: "Email");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_RefreshTokens_ApplicationUserId",
                 table: "RefreshTokens",
                 column: "ApplicationUserId");
@@ -58,6 +63,10 @@ namespace Project_X.Data.Migrations
         {
             migrationBuilder.DropTable(
                 name: "RefreshTokens");
+
+            migrationBuilder.DropIndex(
+                name: "IX_AspNetUsers_Email",
+                table: "AspNetUsers");
 
             migrationBuilder.AlterColumn<string>(
                 name: "CreatedBy",

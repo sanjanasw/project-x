@@ -19,6 +19,8 @@ namespace Project_X.Data.Models
         public string? ReplacedByToken { get; set; }
 
         public bool IsActive => Revoked == null && !IsExpired;
+
+        public string ApplicationUserId { get; set; }
     }
 }
 

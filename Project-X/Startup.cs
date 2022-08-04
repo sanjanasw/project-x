@@ -98,6 +98,9 @@ namespace Project_X
                 options.ReportApiVersions = true;
             });
 
+            //auto mapper config
+            services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+
             //injecting logger
             services.AddSingleton(typeof(IApplicationLogger<>), typeof(SerilogLogger<>));
             services.AddControllers();
