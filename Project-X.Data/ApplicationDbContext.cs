@@ -15,5 +15,7 @@ namespace Project_X.Data
         {
             base.OnModelCreating(builder);
         }
+
+        public virtual DbSet<RefreshToken>? RefreshTokens { get; set; }
     }
 }

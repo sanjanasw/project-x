@@ -12,11 +12,11 @@ namespace Project_X.Data.General
         public virtual int Id { get; set; }
         [Required]
         public DateTime CreatedOn { get; set; } = DateTime.Now.ToUniversalTime();
-        public string CreatedBy { get; set; }
+        public string? CreatedBy { get; set; }
         public DateTime? ModifiedOn { get; set; }
-        public string ModifiedBy { get; set; }
+        public string? ModifiedBy { get; set; }
         public DateTime? DeletedOn { get; set; }
-        public string DeletedBy { get; set; }
+        public string? DeletedBy { get; set; }
         [Required]
         public RecordStatus Status { get; set; } = RecordStatus.Active;
     }
