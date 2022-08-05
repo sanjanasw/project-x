@@ -8,6 +8,9 @@ namespace Project_X.Business.Mappings
     {
         public AutoMapperProfile()
         {
+
+            CreateMap<RegisterViewModel, ApplicationUser>();
+
             CreateMap<ApplicationUser, UserViewModel>()
                 .ForMember(
                     destination => destination.Name,

@@ -39,7 +39,7 @@ namespace Project_X.Controllers
         public async Task<IActionResult> RefreshToken()
         {
             var refreshToken = Request.Cookies["refreshToken"];
-            var response = await _authService.RefreshToken(refreshToken, IpAddress());
+            var response = await _authService.RefreshTokenAsync(refreshToken, IpAddress());
 
             if (response == null)
                 return Unauthorized(new { message = "Invalid token" });
@@ -50,7 +50,7 @@ namespace Project_X.Controllers
         }
 
         [HttpPost]
-        //[Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         [Route("revoke-token")]
         public IActionResult RevokeToken(RevokeTokenRequest model)
         {

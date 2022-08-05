@@ -1,7 +1,9 @@
-﻿using Project_X.Data.General;
+﻿using System.ComponentModel;
+using Project_X.Data.General;
 
 namespace Project_X.Data.Models
 {
+    [DisplayName("RefreshToken")]
     public class RefreshToken : DataRecord
     {
         public string? Token { get; set; }
