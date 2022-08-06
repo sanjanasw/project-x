@@ -6,11 +6,11 @@ namespace Project_X.Data.Interfaces
     {
         int Id { get; set; }
         DateTime CreatedOn { get; set; }
-        string CreatedBy { get; set; }
+        string? CreatedBy { get; set; }
         DateTime? ModifiedOn { get; set; }
-        string ModifiedBy { get; set; }
+        string? ModifiedBy { get; set; }
         DateTime? DeletedOn { get; set; }
-        string DeletedBy { get; set; }
+        string? DeletedBy { get; set; }
         RecordStatus Status { get; set; }
     }
 }

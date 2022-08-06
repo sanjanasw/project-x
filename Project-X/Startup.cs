@@ -1,6 +1,11 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Project_X.Business;
+using Project_X.Business.Interfaces;
 using Project_X.Data;
+using Project_X.Data.Models;
+using Project_X.Helpers.JWT;
 using Project_X.Logging.Interfaces;
 using Project_X.Logging.Serilog;
 using Project_X.Middlewares;
@@ -19,11 +24,11 @@ namespace Project_X
         private const string SECUIRITY_SCHEMA_FORMAT = "Swagger:OpenApiSecurityScheme:BearerFormat";
         private const string SECUIRITY_SCHEMA = "Swagger:OpenApiSecurityScheme:Scheme";
 
-        public IConfiguration Configuration { get; }
+        public IConfiguration _configuration { get; }
 
         public Startup(IConfiguration configuration)
         {
-            Configuration = configuration;
+            _configuration = configuration;
         }
 
         public void ConfigureServices(IServiceCollection services)
@@ -32,31 +37,36 @@ namespace Project_X
             services.AddDbContext<DbContext, ApplicationDbContext>(options =>
                 {
 
-                    options.UseSqlServer(Configuration.GetConnectionString("default"));
+                    options.UseSqlServer(_configuration.GetConnectionString("default"));
 #if DEBUG
                     options.EnableSensitiveDataLogging();
 #endif
                 }
             );
 
+            //injecting application user
+            services.AddIdentity<ApplicationUser, IdentityRole>()
+                .AddEntityFrameworkStores<ApplicationDbContext>()
+                .AddDefaultTokenProviders();
+
             //injecting swagger
             services.AddSwaggerGen(c =>
             {
-                c.SwaggerDoc(this.Configuration.GetValue<string>(API_VERSION),
+                c.SwaggerDoc(this._configuration.GetValue<string>(API_VERSION),
                     new OpenApiInfo
                     {
-                        Title = this.Configuration.GetValue<string>(API_TITLE),
-                        Version = this.Configuration.GetValue<string>(API_VERSION)
+                        Title = this._configuration.GetValue<string>(API_TITLE),
+                        Version = this._configuration.GetValue<string>(API_VERSION)
                     });
 
                 c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
                 {
                     In = ParameterLocation.Header,
-                    Description = this.Configuration.GetValue<string>(SECUIRITY_SCHEMA_DESCRIPTION),
-                    Name = this.Configuration.GetValue<string>(SECUIRITY_SCHEMA_NAME),
+                    Description = this._configuration.GetValue<string>(SECUIRITY_SCHEMA_DESCRIPTION),
+                    Name = this._configuration.GetValue<string>(SECUIRITY_SCHEMA_NAME),
                     Type = SecuritySchemeType.Http,
-                    BearerFormat = this.Configuration.GetValue<string>(SECUIRITY_SCHEMA_FORMAT),
-                    Scheme = this.Configuration.GetValue<string>(SECUIRITY_SCHEMA)
+                    BearerFormat = this._configuration.GetValue<string>(SECUIRITY_SCHEMA_FORMAT),
+                    Scheme = this._configuration.GetValue<string>(SECUIRITY_SCHEMA)
                 });
 
                 c.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -67,7 +77,7 @@ namespace Project_X
                             Reference = new OpenApiReference
                             {
                                 Type=ReferenceType.SecurityScheme,
-                                Id=this.Configuration.GetValue<string>(SECUIRITY_SCHEMA)
+                                Id=this._configuration.GetValue<string>(SECUIRITY_SCHEMA)
                             }
                         },
                         new string[]{}
@@ -88,9 +98,18 @@ namespace Project_X
                 options.ReportApiVersions = true;
             });
 
+            //auto mapper config
+            services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+
             //injecting logger
             services.AddSingleton(typeof(IApplicationLogger<>), typeof(SerilogLogger<>));
             services.AddControllers();
+
+            //JWT configurations
+            services.Configure<JWTConfigurations>(_configuration.GetSection("JWTConfiguration"));
+
+            //injecting application services
+            services.AddScoped<IAuthService, AuthService>();
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -104,6 +123,7 @@ namespace Project_X
 
             app.UseRouting();
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.UseAccessLoggerMiddleware();
@@ -113,7 +133,7 @@ namespace Project_X
 
             app.UseSwaggerUI(c =>
             {
-                c.SwaggerEndpoint(this.Configuration.GetValue<string>(SWAGGER_URL_RELEASE), string.Concat(this.Configuration.GetValue<string>(API_TITLE), ' ', this.Configuration.GetValue<string>(API_VERSION)));
+                c.SwaggerEndpoint(this._configuration.GetValue<string>(SWAGGER_URL_RELEASE), string.Concat(this._configuration.GetValue<string>(API_TITLE), ' ', this._configuration.GetValue<string>(API_VERSION)));
             });
 
             app.UseEndpoints(endpoints =>
