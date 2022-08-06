@@ -1,4 +1,5 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
+using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -9,11 +10,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Predictly_Api.Helpers;
 using Project_X.Business.Interfaces;
 using Project_X.Business.ViewModels;
 using Project_X.Common.Enums;
 using Project_X.Data;
 using Project_X.Data.Models;
+using Project_X.Helpers;
 using Project_X.Helpers.JWT;
 
 namespace Project_X.Business
@@ -26,14 +29,15 @@ namespace Project_X.Business
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IMapper _mapper;
         private readonly ILogger<AuthService> _logger;
-        private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly JWTConfigurations _jwtConfigurations;
+        private readonly IEmailService _emailService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public AuthService(ApplicationDbContext context, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager,
-            SignInManager<ApplicationUser> signInManager, IMapper mapper, ILogger<AuthService> logger, IHttpContextAccessor httpContextAccessor,
-            IOptions<JWTConfigurations> jwtConfigurations) =>
-            (_context, _userManager, _roleManager, _signInManager, _mapper, _logger, _httpContextAccessor, _jwtConfigurations) =
-            (context, userManager, roleManager, signInManager, mapper, logger, httpContextAccessor, jwtConfigurations.Value);
+            SignInManager<ApplicationUser> signInManager, IMapper mapper, ILogger<AuthService> logger,
+            IOptions<JWTConfigurations> jwtConfigurations, IEmailService emailService, IHttpContextAccessor httpContextAccessor) =>
+            (_context, _userManager, _roleManager, _signInManager, _mapper, _logger, _jwtConfigurations, _emailService, _httpContextAccessor) =
+            (context, userManager, roleManager, signInManager, mapper, logger, jwtConfigurations.Value, emailService, httpContextAccessor);
 
 
         public async Task<JWTResult> SignInJWTAsync(string username, string password, string? ipAddress = null)
@@ -44,6 +48,11 @@ namespace Project_X.Business
 
                 if (user != null)
                 {
+                    if (!(await _userManager.IsEmailConfirmedAsync(user)))
+                    {
+                        throw new HumanErrorException(HttpStatusCode.Forbidden, "Email should verified before login to the system");
+                    }
+
                     var signInResult = await _signInManager.CheckPasswordSignInAsync(user, password, false);
                     if (signInResult != null && signInResult.Succeeded)
                     {
@@ -73,51 +82,206 @@ namespace Project_X.Business
                             await _context.SaveChangesAsync();
                             jwtResult.RefreshToken = refreshToken.Token;
                         }
-
+                        _logger.LogInformation(string.Format("{0} logged in to the system", username));
                         return jwtResult;
 
                     }
                 }
+                throw new Exception("Incorrect username or password");
             }
             catch (Exception ex)
             {
-                throw ex;
+                _logger.LogError(ex.Message, ex);
+                throw;
             }
-            throw new Exception("Incorrect username or password");
         }
 
 
-        public async Task<ApplicationUser> CreateAdminAsync(RegisterViewModel model)
+        public async Task<UserViewModel> CreateUserAsync(RegisterViewModel model, UserRoles role)
         {
-            var user = new ApplicationUser
+            using (var transaction = await _context.Database.BeginTransactionAsync())
             {
-                FirstName = model.FirstName,
-                LastName = model.LastName,
-                UserName = model.UserName,
-                Email = model.Email,
-                CreatedBy = "Self Onboarding",
-            };
-            var result = await _userManager.CreateAsync(user, model.Password);
+                try
+                {
+                    var user = _mapper.Map<ApplicationUser>(model);
+                    var result = await _userManager.CreateAsync(user, model.Password);
 
-            if (!await _roleManager.RoleExistsAsync(UserRoles.Admin.ToString()))
-                await _roleManager.CreateAsync(new IdentityRole(UserRoles.Admin.ToString()));
+                    if (result.Succeeded)
+                    {
+                        if (!await _roleManager.RoleExistsAsync(UserRoles.Admin.ToString()))
+                            await _roleManager.CreateAsync(new IdentityRole(UserRoles.Admin.ToString()));
+                        if (!await _roleManager.RoleExistsAsync(UserRoles.User.ToString()))
+                            await _roleManager.CreateAsync(new IdentityRole(UserRoles.User.ToString()));
 
-            if (await _roleManager.RoleExistsAsync(UserRoles.Admin.ToString()))
-                await _userManager.AddToRoleAsync(user, UserRoles.Admin.ToString());
+                        switch (role)
+                        {
+                            case UserRoles.Admin:
+                                if (await _roleManager.RoleExistsAsync(UserRoles.Admin.ToString()))
+                                    await _userManager.AddToRoleAsync(user, UserRoles.Admin.ToString());
+                                break;
+                            default:
+                                if (await _roleManager.RoleExistsAsync(UserRoles.User.ToString()))
+                                    await _userManager.AddToRoleAsync(user, UserRoles.User.ToString());
+                                break;
+                        }
+                        string confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                        var emailTemplate = new EmailTemplates().GetEmailTemplate(EmailTypes.Verification, user.Email, user, confirmationToken);
+                        _emailService.Send(emailTemplate.Email, emailTemplate.Subject, emailTemplate.Html);
+                        _logger.LogInformation(string.Format("{0} new {1} registered successfully.", user.UserName, role.ToString()));
+                        transaction.Commit();
+                        return _mapper.Map<UserViewModel>(user);
+                    }
 
-            if (result.Succeeded)
-            {
-                _logger.LogInformation("new user created");
-                return user;
+                    _logger.LogWarning(result.Errors.First().Description);
+                    transaction.Rollback();
+                    throw new HumanErrorException(HttpStatusCode.Conflict, result.Errors);
+                }
+                catch (Exception ex)
+                {
+                    transaction.Rollback();
+                    _logger.LogError(ex.Message, ex);
+                    throw;
+                }
             }
+        }
 
-            return null;
+        public async Task<bool> ResendConfirmationEmailAsync(ResendConfirmationEmailViewModel model)
+        {
+            try
+            {
+                var user = await _userManager.FindByEmailAsync(model.Email);
+
+                if (user == null)
+                {
+                    throw new HumanErrorException(HttpStatusCode.NotFound, "User not found");
+                }
+
+                if ((await _userManager.IsEmailConfirmedAsync(user)))
+                {
+                    throw new HumanErrorException(HttpStatusCode.Forbidden, "Email already confirmed by user");
+                }
+
+                string confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                var emailTemplate = new EmailTemplates().GetEmailTemplate(EmailTypes.Verification, user.Email, user, confirmationToken);
+                _emailService.Send(emailTemplate.Email, emailTemplate.Subject, emailTemplate.Html);
+                _logger.LogInformation(string.Format("{0}, confirmation email resent", model.Email));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.Message, ex);
+                throw;
+            }
+        }
+
+        public async Task<bool> VerifyEmailAsync(ConfirmEmailViewModel model)
+        {
+            try
+            {
+                var user = await _userManager.FindByIdAsync(model.UserId);
+                if (user == null)
+                    throw new HumanErrorException(HttpStatusCode.NotFound, "User not found");
+                var result = await _userManager.ConfirmEmailAsync(user, model.Token);
+                if (result.Succeeded)
+                {
+                    var emailTemplate = new EmailTemplates().GetEmailTemplate(EmailTypes.Verified, user.Email, user);
+                    _emailService.Send(emailTemplate.Email, emailTemplate.Subject, emailTemplate.Html);
+                    _logger.LogInformation(string.Format("{0} successfully confirmed email", user.UserName));
+                    return true;
+                }
+                _logger.LogWarning(string.Format("{0} is tried to comfirm email with invalid token", user.UserName));
+                throw new HumanErrorException(HttpStatusCode.BadRequest, result.Errors);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.Message, ex);
+                throw;
+            }
+        }
+
+        public async Task<bool> ForgetPasswordAsync(ForgetPasswordViewModel model)
+        {
+            try
+            {
+                var user = await _userManager.FindByEmailAsync(model.Email);
+
+                if (user == null)
+                {
+                    throw new HumanErrorException(HttpStatusCode.NotFound, "User not found");
+                }
+
+                if (!(await _userManager.IsEmailConfirmedAsync(user)))
+                {
+                    throw new HumanErrorException(HttpStatusCode.Forbidden, "Email should verified before forget password");
+                }
+
+                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var emailTemplate = new EmailTemplates().GetEmailTemplate(EmailTypes.ResetPassword, user.Email, user, token);
+                _emailService.Send(emailTemplate.Email, emailTemplate.Subject, emailTemplate.Html);
+                _logger.LogInformation(string.Format("{0} reset password token sent", user.UserName));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.Message, ex);
+                throw;
+            }
+        }
+
+        public async Task<bool> ResetPasswordAsync(ResetPasswordViewModel model)
+        {
+            try
+            {
+                var user = await _userManager.FindByIdAsync(model.Userid);
+
+                if (user == null)
+                {
+                    throw new HumanErrorException(HttpStatusCode.NotFound, "User not found");
+                }
+
+                var result = await _userManager.ResetPasswordAsync(user, model.Token, model.Password);
+
+                if (result.Succeeded)
+                {
+                    var emailTemplate = new EmailTemplates().GetEmailTemplate(EmailTypes.PasswordResetSuccess, user.Email, user);
+                    _emailService.Send(emailTemplate.Email, emailTemplate.Subject, emailTemplate.Html);
+                    _logger.LogInformation(string.Format("{0} successfully resetted password", user.UserName));
+                    return true;
+                }
+
+                _logger.LogWarning(string.Format("{0} password reset attempt unsuccessful", user.UserName));
+                throw new HumanErrorException(HttpStatusCode.BadRequest, result.Errors);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.Message, ex);
+                throw;
+            }
+        }
+
+        public async Task<bool> ChangePasswordAsync(ChangePasswordViewModel model)
+        {
+            return true;
         }
 
         public Task SignOutAsync()
         {
             return _signInManager.SignOutAsync();
         }
+
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
+        public string GetCurrentLoggedInUsername()
+        {
+            return _httpContextAccessor.HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.GivenName)
+                .Value;
+        }
+
+        public string GetApplicationUserId()
+        {
+            return _httpContextAccessor.HttpContext.User.Claims
+                .FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier).Value;
+        }
+#pragma warning restore CS8602 // Dereference of a possibly null reference.
 
         public bool RevokeToken(string token, string ipAddress)
         {
@@ -133,7 +297,7 @@ namespace Project_X.Business
                 var refreshToken = user.RefreshTokens.SingleOrDefault(x => x.Token == token);
 
                 // return false if token is not active
-                if (!refreshToken.IsActive)
+                if (!refreshToken!.IsActive)
                     return false;
 
                 // revoke token and save
@@ -142,18 +306,18 @@ namespace Project_X.Business
                 _context.Update(user);
                 _context.SaveChanges();
 
+                _logger.LogWarning(string.Format("{0}'s refrsh token revoked by {1}", user.UserName, ipAddress));
                 return true;
             }
             catch (Exception ex)
             {
-
-                throw ex;
+                _logger.LogError(ex.Message, ex);
+                throw;
             }
         }
 
         public async Task<JWTResult> RefreshTokenAsync(string token, string ipAddress)
         {
-
             try
             {
                 var user = _context.Set<ApplicationUser>().Include(x => x.RefreshTokens)
@@ -161,12 +325,14 @@ namespace Project_X.Business
 
                 // return null if no user found with token
                 if (user == null)
+#pragma warning disable CS8603 // Possible null reference return.
                     return null;
 
                 var refreshToken = user.RefreshTokens.SingleOrDefault(x => x.Token == token);
                 // return null if token is no longer active
-                if (!refreshToken.IsActive)
+                if (!refreshToken!.IsActive)
                     return null;
+#pragma warning restore CS8603 // Possible null reference return.
 
                 // replace old refresh token with a new one and save
                 var newRefreshToken = GenerateRefreshToken(ipAddress);
@@ -192,13 +358,14 @@ namespace Project_X.Business
             }
             catch (Exception ex)
             {
-
-                throw ex;
+                _logger.LogError(ex.Message, ex);
+                throw;
             }
         }
 
         private RefreshToken GenerateRefreshToken(string ipAddress)
         {
+#pragma warning disable SYSLIB0023 // Type or member is obsolete
             using (var rngCryptoServiceProvider = new RNGCryptoServiceProvider())
             {
                 var randomBytes = new byte[64];
@@ -210,14 +377,17 @@ namespace Project_X.Business
                     CreatedByIp = ipAddress
                 };
             }
+#pragma warning restore SYSLIB0023 // Type or member is obsolete
         }
 
         private JwtSecurityToken GenerateJWT(ApplicationUser user, IList<string>? userRoles)
         {
-            var claims = new List<Claim>();
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id),
+                new Claim(ClaimTypes.GivenName, user.UserName)
+            };
 
-            claims.Add(new Claim(ClaimTypes.NameIdentifier, user.Id));
-            claims.Add(new Claim(ClaimTypes.GivenName, user.UserName));
             if (userRoles != null)
             {
                 foreach (var userRole in userRoles)
@@ -226,7 +396,9 @@ namespace Project_X.Business
                 }
             }
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtConfigurations.Key));
+#pragma warning disable CS8604 // Possible null reference argument.
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtConfigurations?.Key));
+#pragma warning restore CS8604 // Possible null reference argument.
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
             return new JwtSecurityToken(
                 _jwtConfigurations.Issuer,

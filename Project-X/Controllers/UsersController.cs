@@ -1,6 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Project_X.Business.Interfaces;
 using Project_X.Business.ViewModels;
+using Project_X.Common.Enums;
 
 namespace Project_X.Controllers
 {
@@ -10,15 +12,23 @@ namespace Project_X.Controllers
     public class UsersController : Controller
     {
         private readonly IAuthService _authService;
-        private readonly ILogger<UsersController> _logger;
 
-        public UsersController(IAuthService authService, ILogger<UsersController> logger) =>
-            (_authService, _logger) = (authService, logger);
+        public UsersController(IAuthService authService) =>
+            (_authService) = (authService);
 
-        [HttpPost("CreateAdmin")]
-        public async Task<IActionResult> CreateAdminAsync(RegisterViewModel model)
+        [AllowAnonymous]
+        [HttpPost("CreateUser")]
+        public async Task<IActionResult> CreateUser(RegisterViewModel model)
         {
-            var result = await _authService.CreateAdminAsync(model);
+            var result = await _authService.CreateUserAsync(model, UserRoles.User);
+            return Ok(result);
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost("CreateAdmin")]
+        public async Task<IActionResult> CreateAdmin(RegisterViewModel model)
+        {
+            var result = await _authService.CreateUserAsync(model, UserRoles.Admin);
             return Ok(result);
         }
     }

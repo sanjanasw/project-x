@@ -1,9 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc.Versioning;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Predictly_Api.Helpers;
 using Project_X.Helpers;
 using Project_X.Middlewares.ResponseWrapper.Wrappers;
 using System.Net;
+using System.Net.Mime;
 
 namespace Project_X.Middlewares.ResponseWrapper
 {
@@ -20,7 +22,9 @@ namespace Project_X.Middlewares.ResponseWrapper
 
         private string GetVersion(HttpContext context)
         {
+#pragma warning disable CS8603 // Possible null reference return.
             return _apiVersionReader.Read(context.Request);
+#pragma warning restore CS8603 // Possible null reference return.
         }
 
         private async Task<string> ReadResponseBodyStreamAsync(Stream bodyStream)
@@ -54,7 +58,7 @@ namespace Project_X.Middlewares.ResponseWrapper
 
         public async Task InvokeAsync(HttpContext context)
         {
-            if (context.Request.Path.Value.Contains("api"))
+            if (context.Request.Path.Value!.Contains("api"))
             {
                 var response = new ApiResponse();
                 var originalResponseBodyStream = context.Response.Body;
@@ -63,7 +67,7 @@ namespace Project_X.Middlewares.ResponseWrapper
                 try
                 {
                     context.Response.Body = memoryStream;
-                    context.Response.ContentType = "application/json";
+                    context.Response.ContentType = MediaTypeNames.Application.Json;
                     await _next.Invoke(context);
                     var bodyAsText = await ReadResponseBodyStreamAsync(memoryStream);
                     context.Response.Body = originalResponseBodyStream;
@@ -71,19 +75,26 @@ namespace Project_X.Middlewares.ResponseWrapper
                     dynamic bodyContent;
                     if (IsValidJson(bodyAsText))
                     {
+#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
                         bodyContent = JsonConvert.DeserializeObject<dynamic>(bodyAsText);
+#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
                     }
-                    else { bodyContent = bodyAsText; }
+                    else
+                    {
+                        bodyContent = bodyAsText;
+                    }
 
-
+#pragma warning disable CS8601 // Possible null reference assignment.
                     response = new ApiResponse
                     {
-                        IsError = false,
-                        Message = "Successful",
                         StatusCode = context.Response.StatusCode,
                         Version = GetVersion(context),
-                        Result = IsValidJson(bodyAsText) ? JsonConvert.SerializeObject(bodyContent) : bodyAsText
+                        Result = bodyContent
                     };
+#pragma warning restore CS8601 // Possible null reference assignment.
+
+                    if (context.Response.StatusCode == 200)
+                        response.Message = "Success";
                 }
                 catch (Exception ex)
                 {
@@ -92,7 +103,11 @@ namespace Project_X.Middlewares.ResponseWrapper
                 }
                 finally
                 {
-                    var text = JsonConvert.SerializeObject(response);
+                    var text = JsonConvert.SerializeObject(response, Formatting.None,
+                        new JsonSerializerSettings
+                        {
+                            NullValueHandling = NullValueHandling.Ignore
+                        });
                     await context.Response.WriteAsync(text);
                 }
             }
@@ -111,7 +126,7 @@ namespace Project_X.Middlewares.ResponseWrapper
 
         public ApiResponse HandleError(HttpContext context, Exception error)
         {
-            context.Response.ContentType = "application/json";
+            context.Response.ContentType = MediaTypeNames.Application.Json;
 
             switch (error)
             {
@@ -121,22 +136,28 @@ namespace Project_X.Middlewares.ResponseWrapper
                 case KeyNotFoundException e:
                     context.Response.StatusCode = (int)HttpStatusCode.NotFound;
                     break;
+                case HumanErrorException e:
+                    context.Response.StatusCode = (int)e.Status;
+                    return new ApiResponse
+                    {
+                        StatusCode = (int)e.Status,
+                        Version = GetVersion(context),
+                        Result = e.Details,
+                    };
                 default:
-                    // unhandled error
                     context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
                     break;
             }
 
             return new ApiResponse
             {
-                IsError = true,
-                Message = error.GetBaseException().Message,
                 StatusCode = context.Response.StatusCode,
                 Version = GetVersion(context),
             };
 
         }
     }
+
 
     public static class ResponseWrapperMiddleware
     {

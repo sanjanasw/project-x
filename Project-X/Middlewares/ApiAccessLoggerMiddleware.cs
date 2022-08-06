@@ -1,14 +1,13 @@
-﻿using Project_X.Logging.Interfaces;
-using System.Security.Claims;
+﻿using System.Security.Claims;
 
 namespace Project_X.Middlewares
 {
     public class ApiAccessLoggerMiddleware
     {
         private readonly RequestDelegate _next;
-        private readonly IApplicationLogger<ApiAccessLoggerMiddleware> _logger;
+        private readonly ILogger<ApiAccessLoggerMiddleware> _logger;
 
-        public ApiAccessLoggerMiddleware(RequestDelegate next, IApplicationLogger<ApiAccessLoggerMiddleware> logger)
+        public ApiAccessLoggerMiddleware(RequestDelegate next, ILogger<ApiAccessLoggerMiddleware> logger)
         {
             _next = next;
             _logger = logger;
@@ -18,8 +17,8 @@ namespace Project_X.Middlewares
         {
             if (context.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value != null)
             {
-                var info = $"UserId: {context.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value ?? "0"} | Username: {context.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.Name)?.Value ?? "anonymous"}| Route: {context.Request.Path.Value}";
-                _logger.Info(info);
+                var info = $"UserId: {context.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value ?? "0"} | Username: {context.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.GivenName)?.Value ?? "anonymous"}| Route: {context.Request.Path.Value}";
+                _logger.LogInformation(info);
             }
             await _next(context);
         }

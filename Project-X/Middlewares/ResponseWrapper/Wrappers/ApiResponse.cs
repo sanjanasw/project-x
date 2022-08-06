@@ -8,8 +8,6 @@
 
         public string Message { get; set; }
 
-        public bool? IsError { get; set; }
-
         public object ResponseException { get; set; }
 
         public object Result { get; set; }
