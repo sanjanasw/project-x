@@ -1,67 +1,94 @@
-﻿using System.ComponentModel;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace Project_X.Business.ViewModels
 {
-    [DisplayName("Login User")]
     public class LoginUserViewModel
     {
-        /// <summary>
-        ///     Registerd username of the user
-        /// </summary>
         [Required(ErrorMessage = "Username is required")]
-
-        [Display(Name = "Username", Prompt = "Enter username")]
         public string Username { get; set; }
 
-        /// <summary>
-        ///     Password related to the username address
-        /// </summary>
         [Required(ErrorMessage = "Password is required")]
-        [DataType(DataType.Password)]
-        [Display(Name = "Password", Prompt = "Enter password")]
         public string Password { get; set; }
 
-        /// <summary>
-        ///     No need to set in API
-        /// </summary>
-        [Display(Name = "Remember me")]
         public bool RememberMe { get; set; }
     }
 
-    [DisplayName("Register")]
     public class RegisterViewModel
     {
-        [Required]
-        [Display(Name = "First name")]
+        [Required(ErrorMessage = "First Name is Required")]
         public string FirstName { get; set; }
 
-        [Required]
-        [Display(Name = "Last name")]
+        [Required(ErrorMessage = "Last Name is Required")]
         public string LastName { get; set; }
 
-        [Required]
-        [Display(Name = "Unique name")]
+        [Required(ErrorMessage = "Username is Required")]
         public string UserName { get; set; }
 
-        [Required]
-        [Display(Name = "Email address")]
+        [Required(ErrorMessage = "Email is Required")]
+        [DataType(DataType.EmailAddress)]
         public string Email { get; set; }
 
-        [Display(Name = "Password")]
+        [Required(ErrorMessage = "Password is Required")]
         [DataType(DataType.Password)]
         public string Password { get; set; }
     }
 
-    [DisplayName("RevokeToken")]
-    public class RefreshTokenRequest
+    public class RefreshTokenViewModel
     {
+        [Required(ErrorMessage = "Token is Required")]
         public string RefreshToken { get; set; }
     }
 
-    public class RevokeTokenRequest
+    public class RevokeTokenViewModel
     {
+        [Required(ErrorMessage = "Token is Required")]
         public string RefreshToken { get; set; }
+    }
+
+    public class ConfirmEmailViewModel
+    {
+        [Required(ErrorMessage = "UserId is Required")]
+        public string UserId { get; set; }
+
+        [Required(ErrorMessage = "Token is Required")]
+        public string Token { get; set; }
+    }
+
+    public class ForgetPasswordViewModel
+    {
+        [EmailAddress]
+        [Required(ErrorMessage = "Email is required")]
+        public string Email { get; set; }
+    }
+
+    public class ResetPasswordViewModel
+    {
+        [Required(ErrorMessage = "User Id is Required")]
+        public string Userid { get; set; }
+
+        [Required(ErrorMessage = "Token is Required")]
+        public string Token { get; set; }
+
+        [Required(ErrorMessage = "Password is Required")]
+        [DataType(DataType.Password)]
+        public string Password { get; set; }
+    }
+
+    public class ChangePasswordViewModel
+    {
+        [Required(ErrorMessage = "Current Password is Required")]
+        [DataType(DataType.Password)]
+        public string CurrentPassword { get; set; }
+
+        [Required(ErrorMessage = "New Password is Required")]
+        [DataType(DataType.Password)]
+        public string NewPassword { get; set; }
+    }
+
+    public class ResendConfirmationEmailViewModel
+    {
+        [Required(ErrorMessage = "Email is Required")]
+        public string Email { get; set; }
     }
 }
 
