@@ -26,8 +26,6 @@ namespace Project_X.Controllers
             if (jwtResult != null)
             {
                 _logger.LogInformation("User logged in. UserName : {0}", user.Username);
-                if (user.RememberMe)
-                    SetTokenCookie(jwtResult.RefreshToken);
                 return Ok(jwtResult);
             }
 
@@ -36,15 +34,12 @@ namespace Project_X.Controllers
 
         [HttpPost]
         [Route("refresh-token")]
-        public async Task<IActionResult> RefreshToken()
+        public async Task<IActionResult> RefreshToken(RefreshTokenRequest model)
         {
-            var refreshToken = Request.Cookies["refreshToken"];
-            var response = await _authService.RefreshToken(refreshToken, IpAddress());
+            var response = await _authService.RefreshToken(model.RefreshToken, IpAddress());
 
             if (response == null)
                 return Unauthorized(new { message = "Invalid token" });
-
-            SetTokenCookie(response.RefreshToken);
 
             return Ok(response);
         }
@@ -55,7 +50,7 @@ namespace Project_X.Controllers
         public IActionResult RevokeToken(RevokeTokenRequest model)
         {
             // accept token from request body or cookie
-            var token = model.Token ?? Request.Cookies["refreshToken"];
+            var token = model.RefreshToken;
 
             if (string.IsNullOrEmpty(token))
                 return BadRequest(new { message = "Token is required" });
@@ -72,17 +67,9 @@ namespace Project_X.Controllers
         {
             if (Request.Headers.ContainsKey("X-Forwarded-For"))
                 return Request.Headers["X-Forwarded-For"];
+#pragma warning disable CS8602
             return HttpContext.Connection.RemoteIpAddress.MapToIPv4().ToString();
-        }
-
-        private void SetTokenCookie(string token)
-        {
-            var cookieOptions = new CookieOptions
-            {
-                HttpOnly = true,
-                Expires = DateTime.UtcNow.AddDays(7)
-            };
-            Response.Cookies.Append("refreshToken", token, cookieOptions);
+#pragma warning restore CS8602
         }
     }
 }

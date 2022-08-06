@@ -123,6 +123,7 @@ namespace Project_X
 
             app.UseRouting();
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.UseAccessLoggerMiddleware();

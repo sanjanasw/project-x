@@ -40,12 +40,6 @@ namespace Project_X.Business
         {
             try
             {
-
-                foreach (string? key in _httpContextAccessor.HttpContext.Request.Cookies.Keys)
-                {
-                    _httpContextAccessor.HttpContext.Response.Cookies.Delete(key);
-                }
-
                 var user = await _userManager.FindByNameAsync(username);
 
                 if (user != null)
@@ -172,7 +166,6 @@ namespace Project_X.Business
                     return null;
 
                 var refreshToken = user.RefreshTokens.SingleOrDefault(x => x.Token == token);
-
                 // return null if token is no longer active
                 if (!refreshToken.IsActive)
                     return null;

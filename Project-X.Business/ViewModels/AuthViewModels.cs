@@ -1,8 +1,7 @@
-﻿using System.ComponentModel;
-using System.ComponentModel.DataAnnotations;
-
-namespace Project_X.Business.ViewModels
+﻿namespace Project_X.Business.ViewModels
 {
+
+
     public class LoginUserViewModel
     {
         public string Username { get; set; }
@@ -21,9 +20,14 @@ namespace Project_X.Business.ViewModels
         public string Password { get; set; }
     }
 
+    public class RefreshTokenRequest
+    {
+        public string RefreshToken { get; set; }
+    }
+
     public class RevokeTokenRequest
     {
-        public string Token { get; set; }
+        public string RefreshToken { get; set; }
     }
 }
 
