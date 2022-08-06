@@ -45,7 +45,7 @@ namespace Project_X.Controllers
         }
 
         [HttpPost]
-        //[Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         [Route("revoke-token")]
         public IActionResult RevokeToken(RevokeTokenRequest model)
         {

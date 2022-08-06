@@ -87,7 +87,7 @@ namespace Project_X.Business
         }
 
 
-        public async Task<ApplicationUser> RegisterAdminAsync(RegisterViewModel model)
+        public async Task<ApplicationUser> CreateAdminAsync(RegisterViewModel model)
         {
             var user = new ApplicationUser
             {
@@ -96,8 +96,6 @@ namespace Project_X.Business
                 UserName = model.UserName,
                 Email = model.Email,
                 CreatedBy = "Self Onboarding",
-                CreatedOn = DateTime.Now,
-                Status = RecordStatus.Active
             };
             var result = await _userManager.CreateAsync(user, model.Password);
 
@@ -153,7 +151,7 @@ namespace Project_X.Business
             }
         }
 
-        public async Task<JWTResult> RefreshToken(string token, string ipAddress)
+        public async Task<JWTResult> RefreshTokenAsync(string token, string ipAddress)
         {
 
             try
