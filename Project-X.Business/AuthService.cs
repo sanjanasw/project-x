@@ -46,7 +46,6 @@ namespace Project_X.Business
             try
             {
                 var user = await _userManager.FindByNameAsync(username);
-
                 if (user != null)
                 {
                     if (!(await _userManager.IsEmailConfirmedAsync(user)))
@@ -87,8 +86,13 @@ namespace Project_X.Business
                         _logger.LogInformation(string.Format("{0} logged in to the system", username));
                         return jwtResult;
                     }
+
+                    throw new HumanErrorException(HttpStatusCode.Unauthorized, "Username or password incorrect");
                 }
-                throw new HumanErrorException(HttpStatusCode.Unauthorized, "Username or password incorrect");
+                else
+                {
+                    throw new HumanErrorException(HttpStatusCode.NotFound, "User not found");
+                }
             }
             catch (Exception ex)
             {
