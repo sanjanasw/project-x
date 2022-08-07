@@ -114,7 +114,18 @@ namespace Project_X.Controllers
             throw new Exception("Password resetting unsuccessful");
         }
 
+        [Authorize]
+        [HttpPost("changet-password")]
+        public async Task<IActionResult> ChangePasswrod(ChangePasswordViewModel model)
+        {
+            var result = await _authService.ChangePasswordAsync(model);
 
+            if (result)
+            {
+                return Ok("Password changed successfully");
+            }
+            throw new Exception("Password changing unsuccessful");
+        }
 
         private string IpAddress()
         {

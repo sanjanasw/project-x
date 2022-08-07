@@ -71,7 +71,7 @@ namespace Project_X.Business
                         {
                             Token = new JwtSecurityTokenHandler().WriteToken(token),
                             Expiration = token.ValidTo,
-                            User = _mapper.Map<UserViewModel>(new ApplicationUserViewModel {ApplicationUser = user, Roles = userRoles })
+                            User = _mapper.Map<UserViewModel>(new ApplicationUserViewModel { ApplicationUser = user, Roles = userRoles })
                         };
 
                         if (ipAddress != null)
@@ -262,7 +262,31 @@ namespace Project_X.Business
 
         public async Task<bool> ChangePasswordAsync(ChangePasswordViewModel model)
         {
-            return true;
+            try
+            {
+                var user = await _userManager.FindByIdAsync(GetLoggedInUserId());
+
+                if (user == null)
+                {
+                    throw new HumanErrorException(HttpStatusCode.NotFound, "User not found");
+                }
+
+                var result = await _userManager.ChangePasswordAsync(user, model.CurrentPassword, model.NewPassword);
+
+                if (result.Succeeded)
+                {
+                    _logger.LogInformation(string.Format("{0} password changed successfully", user.UserName));
+                    return true;
+                }
+
+                _logger.LogWarning(string.Format("{0} password chanege attempt unsuccessful", user.UserName));
+                throw new HumanErrorException(HttpStatusCode.BadRequest, result.Errors);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.Message, ex);
+                throw;
+            }
         }
 
         public Task SignOutAsync()
@@ -277,7 +301,7 @@ namespace Project_X.Business
                 .Value;
         }
 
-        public string GetApplicationUserId()
+        public string GetLoggedInUserId()
         {
             return _httpContextAccessor.HttpContext.User.Claims
                 .FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier).Value;
@@ -365,9 +389,11 @@ namespace Project_X.Business
             }
         }
 
-        public UserViewModel GetCurrentLoggedInUser()
+        public async Task<UserViewModel> GetCurrentLoggedInUserAsync()
         {
-            return null;
+            var user = _userManager.FindByIdAsync(GetLoggedInUserId());
+            var userRoles = _userManager.GetRolesAsync(await user);
+            return _mapper.Map<UserViewModel>(new ApplicationUserViewModel { ApplicationUser = await user, Roles = await userRoles });
         }
 
         private RefreshToken GenerateRefreshToken(string ipAddress)

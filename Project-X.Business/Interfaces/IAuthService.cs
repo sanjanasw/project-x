@@ -26,7 +26,9 @@ namespace Project_X.Business.Interfaces
 
         public string GetCurrentLoggedInUsername();
 
-        public string GetApplicationUserId();
+        public string GetLoggedInUserId();
+
+        public Task<UserViewModel> GetCurrentLoggedInUserAsync();
 
         public Task SignOutAsync();
     }
