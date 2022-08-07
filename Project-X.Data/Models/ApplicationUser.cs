@@ -32,5 +32,6 @@ namespace Project_X.Data.Models
 
         [JsonIgnore]
         public virtual List<RefreshToken> RefreshTokens { get; set; }
+
     }
 }

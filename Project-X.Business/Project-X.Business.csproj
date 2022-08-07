@@ -10,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Project-X.Data\Project-X.Data.csproj" />
     <ProjectReference Include="..\Project-X.Helpers\Project-X.Helpers.csproj" />
+    <ProjectReference Include="..\Project-X.Services\Project-X.Services.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Interfaces\" />
@@ -19,7 +20,6 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="11.0.1" />
-    <PackageReference Include="MailKit" Version="3.3.0" />
     <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.2.2" />
     <PackageReference Include="Microsoft.AspNetCore.Identity" Version="2.2.0" />
   </ItemGroup>

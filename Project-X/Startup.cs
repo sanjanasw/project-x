@@ -11,6 +11,8 @@ using Project_X.Helpers;
 using Project_X.Helpers.JWT;
 using Project_X.Middlewares;
 using Project_X.Middlewares.ResponseWrapper;
+using Project_X.Services;
+using Project_X.Services.Interfaces;
 using Project_X.SwaggerDocFilters;
 using System.Reflection;
 using System.Text;
@@ -109,9 +111,12 @@ namespace Project_X
             services.Configure<JWTConfigurations>(_configuration.GetSection("JWTConfiguration"));
             services.Configure<AppSettings>(_configuration.GetSection("AppSettings"));
 
+            // configure DI for services
+            services.AddScoped<IEmailService, EmailService>();
+
             // configure DI for application services
             services.AddScoped<IAuthService, AuthService>();
-            services.AddScoped<IEmailService, EmailService>();
+            services.AddScoped<IUserService, UserService>();
 
             // enable CORS
             services.AddCors(o => o.AddPolicy("AllowAnyOrigin", builder =>

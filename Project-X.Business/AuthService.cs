@@ -18,6 +18,7 @@ using Project_X.Data;
 using Project_X.Data.Models;
 using Project_X.Helpers;
 using Project_X.Helpers.JWT;
+using Project_X.Services.Interfaces;
 
 namespace Project_X.Business
 {
@@ -65,11 +66,12 @@ namespace Project_X.Business
                                 new Claim(ClaimTypes.Role, userRole));
                         }
                         var token = GenerateJWT(user, userRoles);
+
                         var jwtResult = new JWTResult
                         {
                             Token = new JwtSecurityTokenHandler().WriteToken(token),
                             Expiration = token.ValidTo,
-                            User = _mapper.Map<UserViewModel>(user)
+                            User = _mapper.Map<UserViewModel>(new ApplicationUserViewModel {ApplicationUser = user, Roles = userRoles })
                         };
 
                         if (ipAddress != null)
@@ -84,10 +86,9 @@ namespace Project_X.Business
                         }
                         _logger.LogInformation(string.Format("{0} logged in to the system", username));
                         return jwtResult;
-
                     }
                 }
-                throw new Exception("Incorrect username or password");
+                throw new HumanErrorException(HttpStatusCode.Unauthorized, "Username or password incorrect");
             }
             catch (Exception ex)
             {
@@ -129,7 +130,7 @@ namespace Project_X.Business
                         _emailService.Send(emailTemplate.Email, emailTemplate.Subject, emailTemplate.Html);
                         _logger.LogInformation(string.Format("{0} new {1} registered successfully.", user.UserName, role.ToString()));
                         transaction.Commit();
-                        return _mapper.Map<UserViewModel>(user);
+                        return _mapper.Map<UserViewModel>(new ApplicationUserViewModel { ApplicationUser = user, Roles = await _userManager.GetRolesAsync(user) });
                     }
 
                     _logger.LogWarning(result.Errors.First().Description);
@@ -351,7 +352,8 @@ namespace Project_X.Business
                 {
                     Token = new JwtSecurityTokenHandler().WriteToken(jwtToken),
                     Expiration = jwtToken.ValidTo,
-                    RefreshToken = newRefreshToken.Token
+                    RefreshToken = newRefreshToken.Token,
+                    User = _mapper.Map<UserViewModel>(new ApplicationUserViewModel { ApplicationUser = user, Roles = userRoles })
                 };
 
                 return jwtResult;
@@ -361,6 +363,11 @@ namespace Project_X.Business
                 _logger.LogError(ex.Message, ex);
                 throw;
             }
+        }
+
+        public UserViewModel GetCurrentLoggedInUser()
+        {
+            return null;
         }
 
         private RefreshToken GenerateRefreshToken(string ipAddress)

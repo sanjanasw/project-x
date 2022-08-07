@@ -12,9 +12,16 @@ namespace Project_X.Controllers
     public class UsersController : Controller
     {
         private readonly IAuthService _authService;
+        private readonly IUserService _userService;
 
-        public UsersController(IAuthService authService) =>
-            (_authService) = (authService);
+        public UsersController(IAuthService authService, IUserService userService) =>
+            (_authService, _userService) = (authService, userService);
+
+        [HttpGet("{role}")]
+        public async Task<IActionResult> GetUsers([FromRoute] UserRoles role)
+        {
+            return Ok(await _userService.GetUsers(role));
+        }
 
         [AllowAnonymous]
         [HttpPost("CreateUser")]

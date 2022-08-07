@@ -1,4 +1,4 @@
-﻿namespace Project_X.Business.Interfaces
+﻿namespace Project_X.Services.Interfaces
 {
     public interface IEmailService
     {

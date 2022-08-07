@@ -3,10 +3,10 @@ using MailKit.Security;
 using Microsoft.Extensions.Options;
 using MimeKit;
 using MimeKit.Text;
-using Project_X.Business.Interfaces;
 using Project_X.Helpers;
+using Project_X.Services.Interfaces;
 
-namespace Project_X.Business
+namespace Project_X.Services
 {
     public class EmailService : IEmailService
     {
