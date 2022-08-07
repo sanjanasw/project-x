@@ -25,7 +25,17 @@ namespace Project_X.Business
         public async Task<List<UserViewModel>> GetUsers(UserRoles role)
         {
             var users = await _userManager.GetUsersInRoleAsync(UserRoles.Admin.ToString());
-            return _mapper.Map<List<UserViewModel>>(users);
+            var usersWithRoles = new List<ApplicationUserViewModel>();
+            foreach (var user in users)
+            {
+                usersWithRoles.Add(new ApplicationUserViewModel
+                {
+                    ApplicationUser = user,
+                    Roles = await _userManager.GetRolesAsync(user),
+                });
+            }
+
+            return _mapper.Map<List<UserViewModel>>(usersWithRoles);
         }
     }
 }

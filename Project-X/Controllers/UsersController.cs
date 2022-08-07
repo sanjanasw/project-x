@@ -17,26 +17,32 @@ namespace Project_X.Controllers
         public UsersController(IAuthService authService, IUserService userService) =>
             (_authService, _userService) = (authService, userService);
 
+        [Authorize(Roles = "Admin")]
         [HttpGet("{role}")]
         public async Task<IActionResult> GetUsers([FromRoute] UserRoles role)
         {
             return Ok(await _userService.GetUsers(role));
         }
 
+        [Authorize]
+        [HttpGet("CurrentUser")]
+        public async Task<IActionResult> GetCurrentUser()
+        {
+            return Ok(await _authService.GetCurrentLoggedInUserAsync());
+        }
+
         [AllowAnonymous]
         [HttpPost("CreateUser")]
         public async Task<IActionResult> CreateUser(RegisterViewModel model)
         {
-            var result = await _authService.CreateUserAsync(model, UserRoles.User);
-            return Ok(result);
+            return Ok(await _authService.CreateUserAsync(model, UserRoles.User));
         }
 
         [Authorize(Roles = "Admin")]
         [HttpPost("CreateAdmin")]
         public async Task<IActionResult> CreateAdmin(RegisterViewModel model)
         {
-            var result = await _authService.CreateUserAsync(model, UserRoles.Admin);
-            return Ok(result);
+            return Ok(await _authService.CreateUserAsync(model, UserRoles.Admin));
         }
     }
 }
