@@ -6,7 +6,11 @@ namespace Project_X.Business.Interfaces
 {
     public interface IAuthService
     {
-        public Task<UserViewModel> CreateUserAsync(RegisterViewModel model, UserRoles role);
+        public Task<UserViewModel> CreateUserAsync(RegisterViewModel model);
+
+        public Task<UserViewModel> CreateAdminAsync(AdminInviteViewModel model);
+
+        public Task<bool> NewUserSetupAsync(NewUserSetupViewModel model, string id);
 
         public Task<JWTResult> SignInJWTAsync(string username, string password, string? ipAddress = null);
 

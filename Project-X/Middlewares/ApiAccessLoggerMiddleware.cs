@@ -15,9 +15,9 @@ namespace Project_X.Middlewares
 
         public async Task InvokeAsync(HttpContext context)
         {
-            if (context.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value != null)
+            if (context.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.GivenName)?.Value != null)
             {
-                var info = $"UserId: {context.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value ?? "0"} | Username: {context.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.GivenName)?.Value ?? "anonymous"}| Route: {context.Request.Path.Value}";
+                var info = $"Username: {context.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.GivenName)?.Value ?? "anonymous"}| Route: {context.Request.Path.Value}";
                 _logger.LogInformation(info);
             }
             await _next(context);

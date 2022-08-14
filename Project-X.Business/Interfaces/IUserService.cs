@@ -5,6 +5,14 @@ namespace Project_X.Business.Interfaces
 {
     public interface IUserService
     {
-        public Task<List<UserViewModel>> GetUsers(UserRoles role);
+        public Task<object> GetUsersAsync(UserRoles? role, string? id);
+
+        public Task<UserViewModel> UpdateUserAsync(string userId, UserUpdateViewModel model);
+
+        public Task<bool> UpdateEmailAsync(UpdateEmailViewModel model);
+
+        public Task<bool> UserDeleteAsync(string userId);
+
+        public Task<bool> ChangeUserRolesAsync(string userId, UserRoleChangeViewModel model);
     }
 }

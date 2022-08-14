@@ -146,6 +146,7 @@ namespace Project_X.Middlewares.ResponseWrapper
                     };
                 default:
                     context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                    
                     break;
             }
 
@@ -153,6 +154,7 @@ namespace Project_X.Middlewares.ResponseWrapper
             {
                 StatusCode = context.Response.StatusCode,
                 Version = GetVersion(context),
+                Message = error.Message
             };
 
         }

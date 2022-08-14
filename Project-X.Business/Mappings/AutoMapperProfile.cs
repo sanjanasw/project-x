@@ -1,6 +1,5 @@
 ﻿using AutoMapper;
 using Project_X.Business.ViewModels;
-using Project_X.Common.Enums;
 using Project_X.Data.Models;
 
 namespace Project_X.Business.Mappings
@@ -11,6 +10,10 @@ namespace Project_X.Business.Mappings
         {
 
             CreateMap<RegisterViewModel, ApplicationUser>();
+
+            CreateMap<AdminInviteViewModel, ApplicationUser>();
+
+            CreateMap<UserUpdateViewModel, ApplicationUser>();
 
             CreateMap<ApplicationUserViewModel, UserViewModel>()
                 .ForMember(
@@ -26,9 +29,15 @@ namespace Project_X.Business.Mappings
                         )
                 )
                 .ForMember(
-                    destination => destination.Name,
+                    destination => destination.FirstName,
                     options => options.MapFrom(
-                        source => source.ApplicationUser.FirstName + " " + source.ApplicationUser.LastName
+                        source => source.ApplicationUser.FirstName
+                        )
+                )
+                .ForMember(
+                    destination => destination.LastName,
+                    options => options.MapFrom(
+                        source => source.ApplicationUser.LastName
                         )
                 )
                 .ForMember(

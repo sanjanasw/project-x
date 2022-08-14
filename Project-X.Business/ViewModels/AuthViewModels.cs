@@ -33,6 +33,32 @@ namespace Project_X.Business.ViewModels
         public string Password { get; set; }
     }
 
+    public class AdminInviteViewModel
+    {
+        [Required(ErrorMessage = "First Name is Required")]
+        public string FirstName { get; set; }
+
+        [Required(ErrorMessage = "Last Name is Required")]
+        public string LastName { get; set; }
+
+        [Required(ErrorMessage = "Username is Required")]
+        public string UserName { get; set; }
+
+        [Required(ErrorMessage = "Email is Required")]
+        [DataType(DataType.EmailAddress)]
+        public string Email { get; set; }
+    }
+
+    public class NewUserSetupViewModel
+    {
+        [Required(ErrorMessage = "Token is Required")]
+        public string Token { get; set; }
+
+        [Required(ErrorMessage = "Password is Required")]
+        [DataType(DataType.Password)]
+        public string Password { get; set; }
+    }
+
     public class RefreshTokenViewModel
     {
         [Required(ErrorMessage = "Token is Required")]

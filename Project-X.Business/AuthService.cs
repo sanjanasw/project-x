@@ -48,9 +48,14 @@ namespace Project_X.Business
                 var user = await _userManager.FindByNameAsync(username);
                 if (user != null)
                 {
-                    if (!(await _userManager.IsEmailConfirmedAsync(user)))
+                    if (!user.EmailConfirmed)
                     {
                         throw new HumanErrorException(HttpStatusCode.Forbidden, "Email should verified before login to the system");
+                    }
+
+                    if (user.Status == RecordStatus.Deleted)
+                    {
+                        throw new HumanErrorException(HttpStatusCode.Forbidden, "Cannot login to deleted accounts");
                     }
 
                     var signInResult = await _signInManager.CheckPasswordSignInAsync(user, password, false);
@@ -101,52 +106,48 @@ namespace Project_X.Business
             }
         }
 
-
-        public async Task<UserViewModel> CreateUserAsync(RegisterViewModel model, UserRoles role)
+        public async Task<UserViewModel> CreateUserAsync(RegisterViewModel model)
         {
-            using (var transaction = await _context.Database.BeginTransactionAsync())
+            var user = _mapper.Map<ApplicationUser>(model);
+            return await CreateNewUserAsync(user, UserRoles.User, model.Password);
+        }
+
+        public async Task<UserViewModel> CreateAdminAsync(AdminInviteViewModel model)
+        {
+            var user = _mapper.Map<ApplicationUser>(model);
+            return await CreateNewUserAsync(user, UserRoles.Admin, Generate());
+        }
+
+        public async Task<bool> NewUserSetupAsync(NewUserSetupViewModel model, string id)
+        {
+            try
             {
-                try
+                var user = await _userManager.FindByIdAsync(id);
+
+                if (user == null)
                 {
-                    var user = _mapper.Map<ApplicationUser>(model);
-                    var result = await _userManager.CreateAsync(user, model.Password);
-
-                    if (result.Succeeded)
-                    {
-                        if (!await _roleManager.RoleExistsAsync(UserRoles.Admin.ToString()))
-                            await _roleManager.CreateAsync(new IdentityRole(UserRoles.Admin.ToString()));
-                        if (!await _roleManager.RoleExistsAsync(UserRoles.User.ToString()))
-                            await _roleManager.CreateAsync(new IdentityRole(UserRoles.User.ToString()));
-
-                        switch (role)
-                        {
-                            case UserRoles.Admin:
-                                if (await _roleManager.RoleExistsAsync(UserRoles.Admin.ToString()))
-                                    await _userManager.AddToRoleAsync(user, UserRoles.Admin.ToString());
-                                break;
-                            default:
-                                if (await _roleManager.RoleExistsAsync(UserRoles.User.ToString()))
-                                    await _userManager.AddToRoleAsync(user, UserRoles.User.ToString());
-                                break;
-                        }
-                        string confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-                        var emailTemplate = new EmailTemplates().GetEmailTemplate(EmailTypes.Verification, user.Email, user, confirmationToken);
-                        _emailService.Send(emailTemplate.Email, emailTemplate.Subject, emailTemplate.Html);
-                        _logger.LogInformation(string.Format("{0} new {1} registered successfully.", user.UserName, role.ToString()));
-                        transaction.Commit();
-                        return _mapper.Map<UserViewModel>(new ApplicationUserViewModel { ApplicationUser = user, Roles = await _userManager.GetRolesAsync(user) });
-                    }
-
-                    _logger.LogWarning(result.Errors.First().Description);
-                    transaction.Rollback();
-                    throw new HumanErrorException(HttpStatusCode.Conflict, result.Errors);
+                    throw new HumanErrorException(HttpStatusCode.NotFound, "User not found");
                 }
-                catch (Exception ex)
+
+                var result = await _userManager.ResetPasswordAsync(user, model.Token, model.Password);
+
+                if (result.Succeeded)
                 {
-                    transaction.Rollback();
-                    _logger.LogError(ex.Message, ex);
-                    throw;
+                    user.EmailConfirmed = true;
+                    await _userManager.UpdateAsync(user);
+                    var emailTemplate = new EmailTemplates().GetEmailTemplate(EmailTypes.NewUserSetupSuccess, user.Email, user);
+                    _emailService.Send(emailTemplate.Email, emailTemplate.Subject, emailTemplate.Html);
+                    _logger.LogInformation(string.Format("{0} is onboarded successfully.", user.UserName));
+                    return true;
                 }
+
+                _logger.LogWarning(string.Format("{0} onbording attempt unsuccessful", user.UserName));
+                throw new HumanErrorException(HttpStatusCode.BadRequest, result.Errors);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.Message, ex);
+                throw;
             }
         }
 
@@ -443,6 +444,98 @@ namespace Project_X.Business
                 claims,
                 expires: DateTime.UtcNow.AddMinutes(_jwtConfigurations.Expires),
                 signingCredentials: credentials);
+        }
+
+        private async Task<UserViewModel> CreateNewUserAsync(ApplicationUser model, UserRoles role, string password)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var result = await _userManager.CreateAsync(model, password);
+
+                if (result.Succeeded)
+                {
+                    if (!await _roleManager.RoleExistsAsync(UserRoles.Admin.ToString()))
+                        await _roleManager.CreateAsync(new IdentityRole(UserRoles.Admin.ToString()));
+                    if (!await _roleManager.RoleExistsAsync(UserRoles.User.ToString()))
+                        await _roleManager.CreateAsync(new IdentityRole(UserRoles.User.ToString()));
+
+                    switch (role)
+                    {
+                        case UserRoles.Admin:
+                            if (await _roleManager.RoleExistsAsync(UserRoles.Admin.ToString()))
+                                await _userManager.AddToRoleAsync(model, UserRoles.Admin.ToString());
+                            string token = await _userManager.GeneratePasswordResetTokenAsync(model);
+                            var newUseremailTemplate = new EmailTemplates().GetEmailTemplate(EmailTypes.NewUser, model.Email, model, token);
+                            _emailService.Send(newUseremailTemplate.Email, newUseremailTemplate.Subject, newUseremailTemplate.Html);
+                            break;
+                        default:
+                            if (await _roleManager.RoleExistsAsync(UserRoles.User.ToString()))
+                                await _userManager.AddToRoleAsync(model, UserRoles.User.ToString());
+                            string confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(model);
+                            var emailTemplate = new EmailTemplates().GetEmailTemplate(EmailTypes.Verification, model.Email, model, confirmationToken);
+                            _emailService.Send(emailTemplate.Email, emailTemplate.Subject, emailTemplate.Html);
+                            break;
+                    }
+
+
+                    _logger.LogInformation(string.Format("{0} new {1} registered successfully.", model.UserName, role.ToString()));
+                    transaction.Commit();
+                    return _mapper.Map<UserViewModel>(new ApplicationUserViewModel { ApplicationUser = model, Roles = await _userManager.GetRolesAsync(model) });
+                }
+
+                _logger.LogWarning(result.Errors.First().Description);
+                transaction.Rollback();
+                throw new HumanErrorException(HttpStatusCode.Conflict, result.Errors);
+            }
+            catch (Exception ex)
+            {
+                transaction.Rollback();
+                _logger.LogError(ex.Message, ex);
+                throw;
+            }
+        }
+
+        private string Generate()
+        {
+            var options = _userManager.Options.Password;
+
+            int length = options.RequiredLength;
+
+            bool nonAlphanumeric = options.RequireNonAlphanumeric;
+            bool digit = options.RequireDigit;
+            bool lowercase = options.RequireLowercase;
+            bool uppercase = options.RequireUppercase;
+
+            StringBuilder password = new StringBuilder();
+            Random random = new Random();
+
+            while (password.Length < length)
+            {
+                char c = (char)random.Next(32, 126);
+
+                password.Append(c);
+
+                if (char.IsDigit(c))
+                    digit = false;
+                else if (char.IsLower(c))
+                    lowercase = false;
+                else if (char.IsUpper(c))
+                    uppercase = false;
+                else if (!char.IsLetterOrDigit(c))
+                    nonAlphanumeric = false;
+            }
+
+            if (nonAlphanumeric)
+                password.Append((char)random.Next(33, 48));
+            if (digit)
+                password.Append((char)random.Next(48, 58));
+            if (lowercase)
+                password.Append((char)random.Next(97, 123));
+            if (uppercase)
+                password.Append((char)random.Next(65, 91));
+
+            return password.ToString();
         }
     }
 }

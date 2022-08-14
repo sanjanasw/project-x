@@ -17,22 +17,25 @@ namespace Project_X.SwaggerDocFilters
             if (authAttributes.Any())
             {
                 var securityRequirement = new OpenApiSecurityRequirement()
-            {
                 {
-                    new OpenApiSecurityScheme
                     {
-                        Reference = new OpenApiReference
+                        new OpenApiSecurityScheme
                         {
-                            Type = ReferenceType.SecurityScheme,
-                            Id = "Bearer"
+                            In = ParameterLocation.Header,
+                            Description = "Please enter into field the word 'Bearer' following by space and JWT",
+                            Name = "Authorization",
+                            Type = SecuritySchemeType.ApiKey,
+                            BearerFormat = "JWT",
+                            Scheme = "Bearer",
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            },
                         },
-                        Scheme = "oauth2",
-                        Name = "Bearer",
-                        In = ParameterLocation.Header,
-                    },
-                    new List<string>()
-                }
-            };
+                        new List<string>()
+                    }
+                };
                 operation.Security = new List<OpenApiSecurityRequirement> { securityRequirement };
                 operation.Responses.Add("401", new OpenApiResponse { Description = "Unauthorized" });
             }

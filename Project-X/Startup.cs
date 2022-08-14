@@ -83,11 +83,16 @@ namespace Project_X
                 c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
                 {
                     In = ParameterLocation.Header,
-                    Description = this._configuration.GetValue<string>("Swagger:OpenApiSecurityScheme:Description"),
-                    Name = this._configuration.GetValue<string>("Swagger:OpenApiSecurityScheme:Name"),
+                    Description = "Please enter into field the word 'Bearer' following by space and JWT",
+                    Name = "Authorization",
                     Type = SecuritySchemeType.ApiKey,
-                    BearerFormat = this._configuration.GetValue<string>("Swagger:OpenApiSecurityScheme:BearerFormat"),
-                    Scheme = this._configuration.GetValue<string>("Swagger:OpenApiSecurityScheme:Scheme")
+                    BearerFormat = "JWT",
+                    Scheme = "Bearer",
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "Bearer"
+                    },
                 });
 
                 c.OperationFilter<AuthResponsesOperationFilter>();
