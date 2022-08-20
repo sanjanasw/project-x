@@ -34,7 +34,7 @@ namespace Project_X.Business
                     var users = new List<ApplicationUser>();
                     if (role == null)
                     {
-                        users = (List<ApplicationUser>)_userManager.Users.ToList();
+                        users = _userManager.Users.ToList();
                     }
                     else
                     {
@@ -55,6 +55,10 @@ namespace Project_X.Business
                 else
                 {
                     var user = await _userManager.FindByIdAsync(id);
+                    if (user == null)
+                    {
+                        throw new HumanErrorException(HttpStatusCode.NotFound, "User not found");
+                    }
                     var roles = await _userManager.GetRolesAsync(user);
                     return _mapper.Map<UserViewModel>(new ApplicationUserViewModel { ApplicationUser = user, Roles = roles });
                 }
